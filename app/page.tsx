@@ -39,7 +39,7 @@ interface ApiResponse {
 }
 
 // 注意：Next.js 前端讀取環境變數必須加上 NEXT_PUBLIC_ 前綴
-const GAS_API_URL = process.env.GAS_WEB_APP_URL;
+const GAS_API_URL = process.env.NEXT_PUBLIC_GAS_WEB_APP_URL;
 
 export default function EventDashboard() {
   const [data, setData] = useState<ApiResponse | null>(null);
