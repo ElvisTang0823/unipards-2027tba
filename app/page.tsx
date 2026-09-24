@@ -38,8 +38,8 @@ interface ApiResponse {
   matches: MatchDetail[];
 }
 
-// 注意：Next.js 前端讀取環境變數必須加上 NEXT_PUBLIC_ 前綴
-const GAS_API_URL = process.env.NEXT_PUBLIC_GAS_WEB_APP_URL;
+// ⚠️ 請在此處填入你的 GAS Web App URL 作為備用（Fallback），確保變數沒讀到時系統依然運作！
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/你的實際GAS_DEPLOY_ID/exec';
 
 export default function EventDashboard() {
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -49,9 +49,12 @@ export default function EventDashboard() {
 
   // 自動拉取資料函數
   const fetchData = async () => {
-    // 1. 檢查環境變數是否存在（縮窄型別，防止 TypeScript undefined 錯誤）
-    if (!GAS_API_URL) {
-      const err = '未設定環境變數 NEXT_PUBLIC_GAS_API_URL，請在 .env.local 或 Vercel 後台設定。';
+    // 優先讀取環境變數，若不存在則自動降級使用預設網址
+    const apiUrl = process.env.NEXT_PUBLIC_GAS_API_URL || DEFAULT_GAS_URL;
+
+    // 如果連預設網址都沒填寫才報錯
+    if (!apiUrl || apiUrl.includes('你的實際GAS_DEPLOY_ID')) {
+      const err = '未設定 API 網址，請確認環境變數 NEXT_PUBLIC_GAS_API_URL 或修改 page.tsx 中的 DEFAULT_GAS_URL。';
       console.error(err);
       setErrorMsg(err);
       setLoading(false);
@@ -59,8 +62,7 @@ export default function EventDashboard() {
     }
 
     try {
-      // 2. 加入 as RequestInit 避開 TS2769 編譯錯誤
-      const res = await fetch(GAS_API_URL, {
+      const res = await fetch(apiUrl, {
         method: 'GET',
         redirect: 'follow',
       } as RequestInit);
