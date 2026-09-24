@@ -49,7 +49,15 @@ export default function EventDashboard() {
   // 自動拉取資料函數
   const fetchData = async () => {
     try {
-      const res = await fetch(GAS_API_URL);
+      const res = await fetch(GAS_API_URL, {
+        method: 'GET',
+        redirect: 'follow', // 確保跟隨 GAS 的 302 重導向
+      });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
       const json: ApiResponse = await res.json();
       setData(json);
     } catch (err) {
@@ -58,7 +66,6 @@ export default function EventDashboard() {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     fetchData();
     // 設定每 15 秒自動刷新一次戰績
