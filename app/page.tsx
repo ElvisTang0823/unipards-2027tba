@@ -1,189 +1,200 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 
-interface Match {
-  match_key: string;
-  red: string[];
-  blue: string[];
-  red_score: number;
-  blue_score: number;
+// 定義 GAS API 回傳的資料型別
+interface TeamRanking {
+  Rank: number;
+  Team: string;
+  Total_RP: number;
+  Avg_RP: number;
+  Record_W_L_T: string;
+  Avg_Score: number;
+  Avg_Auto: number;
+  Avg_Teleop: number;
+  Avg_Endgame: number;
+  Played: number;
 }
 
-interface Ranking {
-  rank: number;
-  team: string;
-  rp: number;
-  tiebreaker: number;
-  played: number;
+interface MatchDetail {
+  Match_Number: string;
+  Red_Alliance: string;
+  Blue_Alliance: string;
+  Red_Total_Score: number;
+  Blue_Total_Score: number;
+  Red_Auto_Score: number;
+  Blue_Auto_Score: number;
+  Red_Teleop_Score: number;
+  Blue_Teleop_Score: number;
+  Red_Endgame_Score: number;
+  Blue_Endgame_Score: number;
+  Red_Total_RP: number;
+  Blue_Total_RP: number;
+  Winner: 'Red' | 'Blue' | 'Tie';
 }
 
-interface Queuing {
-  current_match: string;
-  on_field: string;
-  queued: string;
-  announcement: string;
+interface ApiResponse {
+  rankings: TeamRanking[];
+  matches: MatchDetail[];
 }
 
-export default function Home() {
-  const [data, setData] = useState<{ matches: Match[]; rankings: Ranking[]; queuing: Queuing } | null>(null);
-  const [tab, setTab] = useState<'matches' | 'rankings' | 'nexus'>('nexus');
+// 替換為你的 GAS Web App 部署網址 (務必為 Web App URL)
+const GAS_API_URL = 'YOUR_GAS_DEPLOYED_WEB_APP_URL';
 
-  // 每 5 秒自動向 Vercel 快取代理抓取最新賽事資料
+export default function EventDashboard() {
+  const [data, setData] = useState<ApiResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<'rankings' | 'matches'>('rankings');
+
+  // 自動拉取資料函數
+  const fetchData = async () => {
+    try {
+      const res = await fetch(GAS_API_URL);
+      const json: ApiResponse = await res.json();
+      setData(json);
+    } catch (err) {
+      console.error('Failed to fetch data from GAS:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch('/api/status');
-        if (res.ok) {
-          const json = await res.json();
-          setData(json);
-        }
-      } catch (err) {
-        console.error('Fetch error:', err);
-      }
-    };
-
     fetchData();
-    const interval = setInterval(fetchData, 5000); // 5 秒 Polling
+    // 設定每 15 秒自動刷新一次戰績
+    const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
   }, []);
 
-  if (!data) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center text-2xl font-bold">
-        載入 Mini-TBA 賽事資料中...
+      <div className="flex h-screen items-center justify-center bg-slate-900 text-white font-mono">
+        <div className="text-xl animate-pulse">Loading Event Data...</div>
       </div>
     );
   }
 
-  const { matches, rankings, queuing } = data;
-
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
-      {/* 頁籤切換 Bar */}
-      <header className="max-w-6xl mx-auto flex flex-wrap justify-between items-center mb-8 pb-4 border-b border-slate-800">
-        <h1 className="text-3xl font-black tracking-wider text-red-500">MINI-TBA</h1>
-        <div className="flex space-x-2 mt-4 sm:mt-0">
+      {/* 標頭 */}
+      <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center mb-8 pb-4 border-b border-slate-800">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
+            FRC Event Dashboard
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">Real-time Competition Insights & Match Breakdown</p>
+        </div>
+        
+        {/* 切換 Tab */}
+        <div className="flex gap-2 mt-4 md:mt-0 bg-slate-900 p-1 rounded-lg border border-slate-800">
           <button
-            onClick={() => setTab('nexus')}
-            className={`px-4 py-2 rounded-lg font-bold transition ${
-              tab === 'nexus' ? 'bg-red-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+            onClick={() => setActiveTab('rankings')}
+            className={`px-4 py-2 rounded-md font-semibold text-sm transition-all ${
+              activeTab === 'rankings' ? 'bg-slate-800 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            📢 Nexus 叫號看板
+            Rankings
           </button>
           <button
-            onClick={() => setTab('matches')}
-            className={`px-4 py-2 rounded-lg font-bold transition ${
-              tab === 'matches' ? 'bg-blue-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+            onClick={() => setActiveTab('matches')}
+            className={`px-4 py-2 rounded-md font-semibold text-sm transition-all ${
+              activeTab === 'matches' ? 'bg-slate-800 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            🏆 比分與賽程
-          </button>
-          <button
-            onClick={() => setTab('rankings')}
-            className={`px-4 py-2 rounded-lg font-bold transition ${
-              tab === 'rankings' ? 'bg-amber-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-            }`}
-          >
-            📊 隊伍排名
+            Matches
           </button>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto">
-        {/* ================= 廣播跑馬燈 ================= */}
-        {queuing?.announcement && (
-          <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 p-4 rounded-xl mb-8 flex items-center space-x-3 animate-pulse">
-            <span className="text-2xl">📢</span>
-            <div className="font-bold text-lg">{queuing.announcement}</div>
-          </div>
-        )}
-
-        {/* ================= TAB 1: NEXUS 叫號看板 ================= */}
-        {tab === 'nexus' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-2xl">
-              <span className="text-slate-400 uppercase tracking-widest font-bold text-sm mb-2">NOW ON FIELD (比賽中)</span>
-              <div className="text-7xl font-black text-emerald-400 my-4">{queuing?.on_field || 'None'}</div>
-              <p className="text-slate-500 text-sm">請現場觀眾與隊伍預備</p>
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-2xl">
-              <span className="text-slate-400 uppercase tracking-widest font-bold text-sm mb-2">ON DECK / QUEUING (預備區報到)</span>
-              <div className="text-6xl font-black text-amber-400 my-4">{queuing?.queued || 'None'}</div>
-              <p className="text-amber-500/80 font-medium text-sm">請上述賽次之隊伍儘速前往 Queueing Area</p>
-            </div>
-          </div>
-        )}
-
-        {/* ================= TAB 2: 比分與賽程 ================= */}
-        {tab === 'matches' && (
-          <div className="space-y-4">
-            {matches.length === 0 ? (
-              <p className="text-slate-500 text-center py-12">尚無比賽數據</p>
-            ) : (
-              matches.map((m) => (
-                <div key={m.match_key} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div className="font-bold text-xl text-slate-300 min-w-[80px]">{m.match_key}</div>
-
-                  {/* Alliance Teams */}
-                  <div className="flex-1 grid grid-cols-2 gap-4 w-full md:w-auto">
-                    {/* Red Alliance */}
-                    <div className="bg-red-950/40 border border-red-800/40 rounded-lg p-3 text-center">
-                      <div className="text-xs text-red-400 font-bold mb-1">RED ALLIANCE</div>
-                      <div className="font-mono text-lg font-bold text-red-200">{m.red.filter(Boolean).join(' - ')}</div>
-                    </div>
-                    {/* Blue Alliance */}
-                    <div className="bg-blue-950/40 border border-blue-800/40 rounded-lg p-3 text-center">
-                      <div className="text-xs text-blue-400 font-bold mb-1">BLUE ALLIANCE</div>
-                      <div className="font-mono text-lg font-bold text-blue-200">{m.blue.filter(Boolean).join(' - ')}</div>
-                    </div>
-                  </div>
-
-                  {/* Scores */}
-                  <div className="flex items-center space-x-3 font-mono text-2xl font-black px-4 py-2 bg-slate-950 rounded-lg border border-slate-800">
-                    <span className="text-red-500">{m.red_score}</span>
-                    <span className="text-slate-600">:</span>
-                    <span className="text-blue-500">{m.blue_score}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* ================= TAB 3: 隊伍排名 ================= */}
-        {tab === 'rankings' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+      <div className="max-w-7xl mx-auto">
+        {/* TAB 1: 隊伍排行榜 */}
+        {activeTab === 'rankings' && (
+          <div className="overflow-x-auto bg-slate-900 rounded-xl border border-slate-800 shadow-xl">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-800/50 text-slate-400 text-sm">
+                <tr className="bg-slate-800/80 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-700">
                   <th className="p-4">Rank</th>
                   <th className="p-4">Team</th>
-                  <th className="p-4">RP (Ranking Points)</th>
-                  <th className="p-4">Tiebreaker</th>
+                  <th className="p-4">Avg RP</th>
+                  <th className="p-4">Total RP</th>
+                  <th className="p-4">W-L-T</th>
+                  <th className="p-4">Avg Score</th>
+                  <th className="p-4">Avg Auto</th>
+                  <th className="p-4">Avg Teleop</th>
+                  <th className="p-4">Avg End</th>
                   <th className="p-4">Played</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800 font-mono">
-                {rankings.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-500">尚無排名資料</td>
+              <tbody className="divide-y divide-slate-800 text-sm font-mono">
+                {data?.rankings.map((team) => (
+                  <tr key={team.Team} className="hover:bg-slate-800/50 transition-colors">
+                    <td className="p-4 font-bold text-amber-400">#{team.Rank}</td>
+                    <td className="p-4 font-bold text-white text-base">{team.Team}</td>
+                    <td className="p-4 text-emerald-400 font-bold">{team.Avg_RP}</td>
+                    <td className="p-4">{team.Total_RP}</td>
+                    <td className="p-4 text-slate-300">{team.Record_W_L_T}</td>
+                    <td className="p-4">{team.Avg_Score}</td>
+                    <td className="p-4 text-slate-400">{team.Avg_Auto}</td>
+                    <td className="p-4 text-slate-400">{team.Avg_Teleop}</td>
+                    <td className="p-4 text-slate-400">{team.Avg_Endgame}</td>
+                    <td className="p-4 text-slate-500">{team.Played}</td>
                   </tr>
-                ) : (
-                  rankings.map((r) => (
-                    <tr key={r.team} className="hover:bg-slate-800/30 transition">
-                      <td className="p-4 font-bold text-amber-400">#{r.rank}</td>
-                      <td className="p-4 font-bold text-white text-lg">{r.team}</td>
-                      <td className="p-4 text-emerald-400 font-bold">{r.rp}</td>
-                      <td className="p-4 text-slate-400">{r.tiebreaker}</td>
-                      <td className="p-4 text-slate-400">{r.played}</td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* TAB 2: 單場數據 Breakdown */}
+        {activeTab === 'matches' && (
+          <div className="grid grid-cols-1 gap-4">
+            {data?.matches.map((match) => (
+              <div key={match.Match_Number} className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+                  {match.Match_Number}
+                </div>
+
+                {/* 對決看板 */}
+                <div className="grid grid-cols-11 gap-2 items-center text-center font-mono">
+                  {/* 紅盟 */}
+                  <div className="col-span-4 bg-red-950/40 border border-red-900/50 p-3 rounded-lg text-left">
+                    <div className="text-red-400 font-bold text-lg mb-1">{match.Red_Alliance}</div>
+                    <div className="text-xs text-slate-400 space-y-1">
+                      <div>Auto: <span className="text-slate-200">{match.Red_Auto_Score}</span></div>
+                      <div>Teleop: <span className="text-slate-200">{match.Red_Teleop_Score}</span></div>
+                      <div>Endgame: <span className="text-slate-200">{match.Red_Endgame_Score}</span></div>
+                    </div>
+                  </div>
+
+                  {/* 比分與 RP */}
+                  <div className="col-span-3 flex flex-col items-center justify-center">
+                    <div className="flex items-center gap-3 text-2xl font-black">
+                      <span className={match.Winner === 'Red' ? 'text-red-500 text-3xl' : 'text-slate-400'}>
+                        {match.Red_Total_Score}
+                      </span>
+                      <span className="text-slate-600 text-sm">VS</span>
+                      <span className={match.Winner === 'Blue' ? 'text-blue-500 text-3xl' : 'text-slate-400'}>
+                        {match.Blue_Total_Score}
+                      </span>
+                    </div>
+                    <div className="flex gap-4 mt-2 text-xs text-slate-400">
+                      <span>+{match.Red_Total_RP} RP</span>
+                      <span>+{match.Blue_Total_RP} RP</span>
+                    </div>
+                  </div>
+
+                  {/* 藍盟 */}
+                  <div className="col-span-4 bg-blue-950/40 border border-blue-900/50 p-3 rounded-lg text-right">
+                    <div className="text-blue-400 font-bold text-lg mb-1">{match.Blue_Alliance}</div>
+                    <div className="text-xs text-slate-400 space-y-1">
+                      <div>Auto: <span className="text-slate-200">{match.Blue_Auto_Score}</span></div>
+                      <div>Teleop: <span className="text-slate-200">{match.Blue_Teleop_Score}</span></div>
+                      <div>Endgame: <span className="text-slate-200">{match.Blue_Endgame_Score}</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
