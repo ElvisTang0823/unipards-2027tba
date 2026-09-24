@@ -39,7 +39,7 @@ interface ApiResponse {
 }
 
 // 替換為你的 GAS Web App 部署網址 (務必為 Web App URL)
-const GAS_API_URL = 'YOUR_GAS_DEPLOYED_WEB_APP_URL';
+const GAS_API_URL = process.env.GAS_WEB_APP_URL;
 
 export default function EventDashboard() {
   const [data, setData] = useState<ApiResponse | null>(null);
