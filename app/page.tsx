@@ -38,21 +38,32 @@ interface ApiResponse {
   matches: MatchDetail[];
 }
 
-// 替換為你的 GAS Web App 部署網址 (務必為 Web App URL)
-const GAS_API_URL = process.env.GAS_WEB_APP_URL;
+// 注意：Next.js 前端讀取環境變數必須加上 NEXT_PUBLIC_ 前綴
+const GAS_API_URL = process.env.NEXT_PUBLIC_GAS_API_URL;
 
 export default function EventDashboard() {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'rankings' | 'matches'>('rankings');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // 自動拉取資料函數
   const fetchData = async () => {
+    // 1. 檢查環境變數是否存在（縮窄型別，防止 TypeScript undefined 錯誤）
+    if (!GAS_API_URL) {
+      const err = '未設定環境變數 NEXT_PUBLIC_GAS_API_URL，請在 .env.local 或 Vercel 後台設定。';
+      console.error(err);
+      setErrorMsg(err);
+      setLoading(false);
+      return;
+    }
+
     try {
+      // 2. 加入 as RequestInit 避開 TS2769 編譯錯誤
       const res = await fetch(GAS_API_URL, {
         method: 'GET',
-        redirect: 'follow', // 確保跟隨 GAS 的 302 重導向
-      });
+        redirect: 'follow',
+      } as RequestInit);
       
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
@@ -60,12 +71,15 @@ export default function EventDashboard() {
 
       const json: ApiResponse = await res.json();
       setData(json);
+      setErrorMsg(null);
     } catch (err) {
       console.error('Failed to fetch data from GAS:', err);
+      setErrorMsg('無法載入賽事數據，請檢查 GAS 部署權限或 API 網址是否正確。');
     } finally {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     fetchData();
     // 設定每 15 秒自動刷新一次戰績
@@ -77,6 +91,17 @@ export default function EventDashboard() {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-900 text-white font-mono">
         <div className="text-xl animate-pulse">Loading Event Data...</div>
+      </div>
+    );
+  }
+
+  if (errorMsg) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-900 text-red-400 font-mono p-4 text-center">
+        <div className="bg-slate-950 p-6 rounded-xl border border-red-900 max-w-lg shadow-2xl">
+          <h2 className="text-xl font-bold mb-2">System Error</h2>
+          <p className="text-sm text-slate-300">{errorMsg}</p>
+        </div>
       </div>
     );
   }
