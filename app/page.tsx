@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type TabKey = 'results' | 'rankings' | 'awards' | 'alliance';
 type MatchFilter = 'all' | 'practice' | 'qualification' | 'playoff';
@@ -72,12 +72,42 @@ interface ApiResponse {
 }
 
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/your_gas_deploy_id/exec';
+const CACHE_KEY = 'nks_event_cache_v1';
+const LAST_FETCH_KEY = 'nks_event_last_fetch_v1';
+const FETCH_INTERVAL_MS = 5000;
 const tabs: { key: TabKey; label: string }[] = [
   { key: 'results', label: 'Results' },
   { key: 'rankings', label: 'Rankings' },
   { key: 'awards', label: 'Awards' },
   { key: 'alliance', label: 'Alliance' },
 ];
+
+const readCachedData = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedData = (payload: unknown) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(LAST_FETCH_KEY, String(Date.now()));
+  } catch {
+    // ignore cache storage failures
+  }
+};
+
+const canFetchNow = () => {
+  if (typeof window === 'undefined') return false;
+  const now = Date.now();
+  const lastFetchAt = Number(window.localStorage.getItem(LAST_FETCH_KEY) ?? '0');
+  return now - lastFetchAt >= FETCH_INTERVAL_MS;
+};
 
 const getValue = (record: Record<string, any> | null | undefined, keys: string[]) => {
   if (!record) return undefined;
@@ -216,6 +246,7 @@ export default function EventDashboard() {
   const [activeFilter, setActiveFilter] = useState<MatchFilter>('all');
   const [selectedMatchNumber, setSelectedMatchNumber] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const lastFetchRef = useRef<number>(0);
 
   useEffect(() => {
     const syncTabFromHash = () => {
@@ -235,33 +266,64 @@ export default function EventDashboard() {
   }, []);
 
   useEffect(() => {
+    const cached = readCachedData();
+    if (cached) {
+      const normalized = normalizeResponse(cached);
+      setData(normalized);
+      setLoading(false);
+      if (normalized.matches.length > 0 && !selectedMatchNumber) {
+        setSelectedMatchNumber(normalized.matches[0].Match_Number);
+      }
+    }
+
     const apiUrl = process.env.NEXT_PUBLIC_GAS_API_URL || DEFAULT_GAS_URL;
     if (!apiUrl || apiUrl.includes('your_gas_deploy_id')) {
-      setErrorMsg('未設定 NEXT_PUBLIC_GAS_API_URL，請先設定 GAS 連結。');
-      setLoading(false);
+      if (!cached) {
+        setErrorMsg('未設定 NEXT_PUBLIC_GAS_API_URL，請先設定 GAS 連結。');
+        setLoading(false);
+      }
       return;
     }
 
     const fetchData = async () => {
+      if (!canFetchNow()) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastFetchRef.current < FETCH_INTERVAL_MS) {
+        return;
+      }
+      lastFetchRef.current = now;
+
       try {
         const res = await fetch(apiUrl, { method: 'GET', redirect: 'follow' });
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const payload = normalizeResponse(await res.json());
-        setData(payload);
+        const payload = await res.json();
+        const normalized = normalizeResponse(payload);
+        setData(normalized);
+        writeCachedData(payload);
         setErrorMsg(null);
-        if (!selectedMatchNumber && payload.matches.length > 0) {
-          setSelectedMatchNumber(payload.matches[0].Match_Number);
+        if (!selectedMatchNumber && normalized.matches.length > 0) {
+          setSelectedMatchNumber(normalized.matches[0].Match_Number);
         }
       } catch (err) {
         console.error('Failed to fetch data from GAS:', err);
-        setErrorMsg('無法載入賽事數據，請確認 GAS 部署網址與權限。');
+        if (!cached) {
+          setErrorMsg('無法載入賽事數據，請確認 GAS 部署網址與權限。');
+        }
       } finally {
-        setLoading(false);
+        if (!cached) {
+          setLoading(false);
+        }
       }
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 15000);
+    const interval = setInterval(() => {
+      fetchData();
+    }, FETCH_INTERVAL_MS);
+
     return () => clearInterval(interval);
   }, [selectedMatchNumber]);
 
