@@ -197,10 +197,10 @@ const normalizeQueue = (queue: Record<string, any> | null | undefined): QueueSta
     return { current_match: 'N/A', on_field: 'N/A', queued: 'N/A', announcement: 'N/A' };
   }
   return {
-    current_match: String(getValue(queue, ['current_match', 'Current_Match', 'currentMatch']) ?? 'N/A'),
-    on_field: String(getValue(queue, ['on_field', 'On_Field', 'onField']) ?? 'N/A'),
-    queued: String(getValue(queue, ['queued', 'Queued', 'on_deck']) ?? 'N/A'),
-    announcement: String(getValue(queue, ['announcement', 'Announcement']) ?? 'N/A'),
+    current_match: String(getValue(queue, ['current_match', 'Current Match', 'Current_Match', 'currentMatch', 'CurrentMatch']) ?? 'N/A'),
+    on_field: String(getValue(queue, ['on_field', 'On Field', 'On_Field', 'onField', 'OnField']) ?? 'N/A'),
+    queued: String(getValue(queue, ['queued', 'QueuedMatches', 'Queued Matches', 'Queued', 'queuedMatches']) ?? 'N/A'),
+    announcement: String(getValue(queue, ['announcement', 'AnnouncementMessage', 'Announcement Message', 'Announcement', 'announcementMessage']) ?? 'N/A'),
   };
 };
 
@@ -274,14 +274,13 @@ export default function EventDashboard() {
       if (normalized.matches.length > 0 && !selectedMatchNumber) {
         setSelectedMatchNumber(normalized.matches[0].Match_Number);
       }
+      return;
     }
 
     const apiUrl = process.env.NEXT_PUBLIC_GAS_API_URL || DEFAULT_GAS_URL;
     if (!apiUrl || apiUrl.includes('your_gas_deploy_id')) {
-      if (!cached) {
-        setErrorMsg('未設定 NEXT_PUBLIC_GAS_API_URL，請先設定 GAS 連結。');
-        setLoading(false);
-      }
+      setErrorMsg('未設定 NEXT_PUBLIC_GAS_API_URL，請先設定 GAS 連結。');
+      setLoading(false);
       return;
     }
 
@@ -309,23 +308,14 @@ export default function EventDashboard() {
         }
       } catch (err) {
         console.error('Failed to fetch data from GAS:', err);
-        if (!cached) {
-          setErrorMsg('無法載入賽事數據，請確認 GAS 部署網址與權限。');
-        }
+        setErrorMsg('無法載入賽事數據，請確認 GAS 部署網址與權限。');
       } finally {
-        if (!cached) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
-    fetchData();
-    const interval = setInterval(() => {
-      fetchData();
-    }, FETCH_INTERVAL_MS);
-
-    return () => clearInterval(interval);
-  }, [selectedMatchNumber]);
+    void fetchData();
+  }, []);
 
   useEffect(() => {
     if (!data?.matches.length) return;
@@ -393,7 +383,7 @@ export default function EventDashboard() {
         <header className="mb-6 border-b border-slate-800 pb-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.32em] text-slate-400">2026 Taiwan Double North Cup Playoffs</p>
+              <p className="text-xs uppercase tracking-[0.32em] text-slate-400">2027 Nanke PreSeason</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight text-white md:text-4xl">
                 <span className="bg-gradient-to-r from-red-500 via-violet-500 to-blue-500 bg-clip-text text-transparent">
                   FRC Event Dashboard

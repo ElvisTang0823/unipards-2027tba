@@ -35,6 +35,35 @@ interface ApiResponse {
 }
 
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/your_gas_deploy_id/exec';
+const CACHE_KEY = 'nks_event_cache_v1';
+const LAST_FETCH_KEY = 'nks_event_last_fetch_v1';
+const FETCH_INTERVAL_MS = 5000;
+
+const readCachedData = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedData = (payload: unknown) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(LAST_FETCH_KEY, String(Date.now()));
+  } catch {
+    // ignore storage errors
+  }
+};
+
+const canFetchNow = () => {
+  if (typeof window === 'undefined') return false;
+  const lastFetchAt = Number(window.localStorage.getItem(LAST_FETCH_KEY) ?? '0');
+  return Date.now() - lastFetchAt >= FETCH_INTERVAL_MS;
+};
 
 const getValue = (record: Record<string, any> | undefined | null, keys: string[]) => {
   if (!record) return undefined;
@@ -94,6 +123,20 @@ export default function MatchDetailPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    const cached = readCachedData();
+    if (cached) {
+      const matches = Array.isArray(cached?.matches) ? cached.matches.map((item: Record<string, any>) => normalizeMatch(item)) : [];
+      setData({
+        rankings: Array.isArray(cached?.rankings) ? cached.rankings : [],
+        matches,
+        awards: Array.isArray(cached?.awards) ? cached.awards : [],
+        queue: cached?.queue ?? {},
+        alliances: Array.isArray(cached?.alliances) ? cached.alliances : [],
+      });
+      setLoading(false);
+      return;
+    }
+
     const apiUrl = process.env.NEXT_PUBLIC_GAS_API_URL || DEFAULT_GAS_URL;
     if (!apiUrl || apiUrl.includes('your_gas_deploy_id')) {
       setErrorMsg('未設定 NEXT_PUBLIC_GAS_API_URL，請設定 GAS 網址後再查看 match 詳細頁。');
@@ -102,18 +145,25 @@ export default function MatchDetailPage() {
     }
 
     const fetchData = async () => {
+      if (!canFetchNow()) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const res = await fetch(apiUrl, { method: 'GET', redirect: 'follow' });
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const payload = await res.json();
         const matches = Array.isArray(payload?.matches) ? payload.matches.map((item: Record<string, any>) => normalizeMatch(item)) : [];
-        setData({
+        const nextData = {
           rankings: Array.isArray(payload?.rankings) ? payload.rankings : [],
           matches,
           awards: Array.isArray(payload?.awards) ? payload.awards : [],
           queue: payload?.queue ?? {},
           alliances: Array.isArray(payload?.alliances) ? payload.alliances : [],
-        });
+        };
+        setData(nextData);
+        writeCachedData(payload);
       } catch (err) {
         console.error('Failed to fetch match detail data:', err);
         setErrorMsg('無法載入比賽詳細資訊。');

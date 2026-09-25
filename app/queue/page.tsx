@@ -11,6 +11,43 @@ interface QueueState {
 }
 
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/your_gas_deploy_id/exec';
+const CACHE_KEY = 'nks_queue_cache_v1';
+const LAST_FETCH_KEY = 'nks_queue_last_fetch_v1';
+const FETCH_INTERVAL_MS = 5000;
+
+const getValue = (record: Record<string, any> | undefined | null, keys: string[]) => {
+  if (!record) return undefined;
+  for (const key of keys) {
+    if (record[key] !== undefined && record[key] !== null && record[key] !== '') return record[key];
+  }
+  return undefined;
+};
+
+const readCachedQueue = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedQueue = (payload: unknown) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(LAST_FETCH_KEY, String(Date.now()));
+  } catch {
+    // ignore storage errors
+  }
+};
+
+const canFetchQueueNow = () => {
+  if (typeof window === 'undefined') return false;
+  const lastFetchAt = Number(window.localStorage.getItem(LAST_FETCH_KEY) ?? '0');
+  return Date.now() - lastFetchAt >= FETCH_INTERVAL_MS;
+};
 
 export default function QueuePage() {
   const [queue, setQueue] = useState<QueueState>({
@@ -22,6 +59,19 @@ export default function QueuePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const cached = readCachedQueue();
+    if (cached) {
+      const queueValue = Array.isArray(cached?.queue) && cached.queue.length > 0 ? cached.queue[0] : cached?.queue ?? {};
+      setQueue({
+        current_match: String(getValue(queueValue, ['current_match', 'Current Match', 'Current_Match', 'currentMatch', 'CurrentMatch']) ?? 'N/A'),
+        on_field: String(getValue(queueValue, ['on_field', 'On Field', 'On_Field', 'onField', 'OnField']) ?? 'N/A'),
+        queued: String(getValue(queueValue, ['queued', 'QueuedMatches', 'Queued Matches', 'Queued', 'queuedMatches']) ?? 'N/A'),
+        announcement: String(getValue(queueValue, ['announcement', 'AnnouncementMessage', 'Announcement Message', 'Announcement', 'announcementMessage']) ?? 'N/A'),
+      });
+      setLoading(false);
+      return;
+    }
+
     const apiUrl = process.env.NEXT_PUBLIC_GAS_API_URL || DEFAULT_GAS_URL;
     if (!apiUrl || apiUrl.includes('your_gas_deploy_id')) {
       setLoading(false);
@@ -29,17 +79,24 @@ export default function QueuePage() {
     }
 
     const fetchQueue = async () => {
+      if (!canFetchQueueNow()) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const res = await fetch(apiUrl, { method: 'GET', redirect: 'follow' });
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const payload = await res.json();
         const queueValue = Array.isArray(payload?.queue) && payload.queue.length > 0 ? payload.queue[0] : payload?.queue ?? {};
-        setQueue({
-          current_match: String(queueValue.current_match || queueValue.currentMatch || queueValue['Current Match'] || 'N/A'),
-          on_field: String(queueValue.on_field || queueValue.onField || queueValue['On Field'] || 'N/A'),
-          queued: String(queueValue.queued || queueValue.Queued || 'N/A'),
-          announcement: String(queueValue.announcement || queueValue.Announcement || 'N/A'),
-        });
+        const nextQueue = {
+          current_match: String(getValue(queueValue, ['current_match', 'Current Match', 'Current_Match', 'currentMatch', 'CurrentMatch']) ?? 'N/A'),
+          on_field: String(getValue(queueValue, ['on_field', 'On Field', 'On_Field', 'onField', 'OnField']) ?? 'N/A'),
+          queued: String(getValue(queueValue, ['queued', 'QueuedMatches', 'Queued Matches', 'Queued', 'queuedMatches']) ?? 'N/A'),
+          announcement: String(getValue(queueValue, ['announcement', 'AnnouncementMessage', 'Announcement Message', 'Announcement', 'announcementMessage']) ?? 'N/A'),
+        };
+        setQueue(nextQueue);
+        writeCachedQueue(payload);
       } catch (err) {
         console.error('Failed to fetch queue data:', err);
       } finally {
