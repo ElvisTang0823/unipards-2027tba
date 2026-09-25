@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 type TabKey = 'results' | 'rankings' | 'awards' | 'alliance';
 type MatchFilter = 'all' | 'practice' | 'qualification' | 'playoff';
@@ -337,6 +337,28 @@ export default function EventDashboard() {
     });
   }, [data, activeFilter]);
 
+  const allianceBracketRounds = useMemo(() => {
+    const baseNames = (data?.alliances ?? []).map((alliance) => alliance.name).filter(Boolean);
+    if (baseNames.length === 0) return [];
+
+    const rounds: Array<Array<{ left: string; right: string }>> = [];
+    let current = [...baseNames];
+
+    while (current.length > 1) {
+      const nextRound: Array<{ left: string; right: string }> = [];
+      for (let i = 0; i < current.length; i += 2) {
+        nextRound.push({
+          left: current[i] ?? 'TBD',
+          right: current[i + 1] ?? 'TBD',
+        });
+      }
+      rounds.push(nextRound);
+      current = Array.from({ length: Math.ceil(nextRound.length / 2) }, (_, index) => `Winner ${index + 1}`);
+    }
+
+    return rounds;
+  }, [data?.alliances]);
+
   const handleTabChange = (nextTab: TabKey) => {
     setActiveTab(nextTab);
     if (typeof window !== 'undefined') {
@@ -435,78 +457,78 @@ export default function EventDashboard() {
                     <th className="w-24 px-3 py-3">Match</th>
                     <th className="px-3 py-3 text-red-300">Red Alliance</th>
                     <th className="px-3 py-3 text-blue-300">Blue Alliance</th>
-                    <th className="w-32 px-3 py-3 text-center">Score</th>
-                    <th className="w-32 px-3 py-3 text-center">Details</th>
+                    <th className="w-32 px-3 py-3 text-center">Scores</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredMatches.map((match) => {
-                    const redTeams = parseAllianceTeams(match.Red_Alliance);
-                    const blueTeams = parseAllianceTeams(match.Blue_Alliance);
+                  {(() => {
+                    const groups = filteredMatches.reduce<Record<string, typeof filteredMatches>>((acc, match) => {
+                      const key = classifyMatchType(match.Match_Number);
+                      const label = key === 'practice' ? 'Practice' : key === 'playoff' ? 'Playoffs' : 'Qualifications';
+                      acc[label] = acc[label] ?? [];
+                      acc[label].push(match);
+                      return acc;
+                    }, {});
 
-                    return (
-                      <tr
-                        key={match.Match_Number}
-                        onClick={() => handleMatchOpen(match.Match_Number)}
-                        className={`cursor-pointer border-t border-slate-800 transition hover:bg-slate-800/60 ${
-                          selectedMatch?.Match_Number === match.Match_Number ? 'bg-slate-800/80' : ''
-                        }`}
-                      >
-                        <td className="px-3 py-3 align-top">
-                          <div className="space-y-2">
-                            <div className="text-base font-black text-white">{match.Match_Number}</div>
-                            <span
-                              className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold uppercase ${
-                                match.Winner === 'Red'
-                                  ? 'bg-red-500/10 text-red-300'
-                                  : match.Winner === 'Blue'
-                                    ? 'bg-blue-500/10 text-blue-300'
-                                    : 'bg-slate-700 text-slate-300'
-                              }`}
+                    return Object.entries(groups).map(([label, matches]) => (
+                      <>
+                        <tr key={`${label}-header`} className="border-t border-slate-800 bg-slate-800/50">
+                          <td colSpan={4} className="px-3 py-3 text-sm font-bold uppercase tracking-[0.22em] text-slate-200">
+                            {label}
+                          </td>
+                        </tr>
+                        {matches.map((match) => {
+                          const redTeams = parseAllianceTeams(match.Red_Alliance);
+                          const blueTeams = parseAllianceTeams(match.Blue_Alliance);
+                          const matchLabel = match.Match_Number.replace(/^QM|^Q|^PM|^P|^SF|^F/i, '').trim();
+                          const displayMatch = (() => {
+                            const raw = String(match.Match_Number ?? '').toUpperCase();
+                            if (raw.startsWith('PM') || raw.startsWith('P')) return `Practice ${matchLabel || '1'}`;
+                            if (raw.startsWith('F') || raw.includes('SF') || raw.includes('QF')) return `Playoff ${matchLabel || '1'}`;
+                            return `Quals ${matchLabel || '1'}`;
+                          })();
+
+                          return (
+                            <tr
+                              key={match.Match_Number}
+                              onClick={() => handleMatchOpen(match.Match_Number)}
+                              className="cursor-pointer border-t border-slate-800 transition hover:bg-slate-800/60"
                             >
-                              {match.Winner === 'Tie' ? 'Tie' : `${match.Winner} Win`}
-                            </span>
-                          </div>
-                        </td>
-
-                        <td className="px-3 py-3 align-top text-red-200">
-                          <div className="space-y-2">
-                            {redTeams.length ? redTeams.map((team) => (
-                              <div key={`${match.Match_Number}-red-${team}`} className={Boolean(match.Red_Eliminated) ? 'line-through opacity-70' : ''}>{team}</div>
-                            )) : <span className="text-slate-500">-</span>}
-                          </div>
-                        </td>
-
-                        <td className="px-3 py-3 align-top text-blue-200">
-                          <div className="space-y-2">
-                            {blueTeams.length ? blueTeams.map((team) => (
-                              <div key={`${match.Match_Number}-blue-${team}`} className={Boolean(match.Blue_Eliminated) ? 'line-through opacity-70' : ''}>{team}</div>
-                            )) : <span className="text-slate-500">-</span>}
-                          </div>
-                        </td>
-
-                        <td className="px-3 py-3 align-top text-center">
-                          <div className="space-y-2 font-mono text-sm">
-                            <div className={match.Winner === 'Red' ? 'font-black text-red-300' : 'text-slate-300'}>{match.Red_Total_Score}</div>
-                            <div className={match.Winner === 'Blue' ? 'font-black text-blue-300' : 'text-slate-300'}>{match.Blue_Total_Score}</div>
-                          </div>
-                        </td>
-
-                        <td className="px-3 py-3 align-top text-center">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleMatchOpen(match.Match_Number);
-                            }}
-                            className="rounded-lg border border-sky-600 bg-sky-600/20 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-sky-200 transition hover:bg-sky-600 hover:text-white"
-                          >
-                            Open
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                              <td className="px-3 py-3 align-middle">
+                                <div className="flex items-center gap-2">
+                                  <span className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-[10px] text-slate-300">
+                                    ○
+                                  </span>
+                                  <span className="text-sm font-semibold text-white">{displayMatch}</span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-3 align-middle text-red-200">
+                                <div className="flex flex-wrap gap-2">
+                                  {redTeams.length ? redTeams.map((team) => (
+                                    <span key={`${match.Match_Number}-red-${team}`} className={Boolean(match.Red_Eliminated) ? 'line-through opacity-70' : ''}>{team}</span>
+                                  )) : <span className="text-slate-500">-</span>}
+                                </div>
+                              </td>
+                              <td className="px-3 py-3 align-middle text-blue-200">
+                                <div className="flex flex-wrap gap-2">
+                                  {blueTeams.length ? blueTeams.map((team) => (
+                                    <span key={`${match.Match_Number}-blue-${team}`} className={Boolean(match.Blue_Eliminated) ? 'line-through opacity-70' : ''}>{team}</span>
+                                  )) : <span className="text-slate-500">-</span>}
+                                </div>
+                              </td>
+                              <td className="px-3 py-3 align-middle text-center font-mono text-sm">
+                                <div className="flex items-center justify-center gap-3">
+                                  <span className={match.Winner === 'Red' ? 'font-black text-red-300' : 'text-slate-300'}>{match.Red_Total_Score}</span>
+                                  <span className="text-slate-500">-</span>
+                                  <span className={match.Winner === 'Blue' ? 'font-black text-blue-300' : 'text-slate-300'}>{match.Blue_Total_Score}</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </>
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -581,33 +603,80 @@ export default function EventDashboard() {
         )}
 
         {activeTab === 'alliance' && (
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl shadow-slate-950/20">
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">Bracket</h2>
+          <section className="space-y-5 rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl shadow-slate-950/20">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">Alliance Bracket</h2>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full border-collapse text-left text-sm">
-                <thead className="bg-slate-800/70 text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                  <tr>
-                    <th className="w-28 px-3 py-3">Alliance</th>
-                    <th className="w-28 px-3 py-3">Slot</th>
-                    <th className="w-28 px-3 py-3">Result</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data?.alliances && data.alliances.length > 0 ? data.alliances : []).map((alliance, index) => (
-                    <tr key={`${alliance.name}-${index}`} className="border-t border-slate-800 text-slate-100">
-                      <td className="px-3 py-3 font-bold text-white">{alliance.name}</td>
-                      <td className="px-3 py-3 text-slate-300">{index + 1}</td>
-                      <td className="px-3 py-3 text-sky-300">{alliance.members.length > 0 ? 'Ready' : 'TBD'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {data?.alliances && data.alliances.length > 0 ? (
+              <div className="space-y-4">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-collapse text-left text-sm">
+                    <thead className="bg-slate-800/70 text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                      <tr>
+                        <th className="w-28 px-3 py-3">Alliance</th>
+                        <th className="px-3 py-3">Teams</th>
+                        <th className="w-28 px-3 py-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.alliances.map((alliance, index) => (
+                        <tr key={`${alliance.name}-${index}`} className="border-t border-slate-800 text-slate-100">
+                          <td className="px-3 py-3 font-bold text-white">{alliance.name}</td>
+                          <td className="px-3 py-3">
+                            <div className="flex flex-wrap gap-2">
+                              {alliance.members.length > 0 ? (
+                                alliance.members.map((team) => (
+                                  <span key={`${alliance.name}-${team}`} className="rounded-full border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs font-semibold text-sky-300">
+                                    {team}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-slate-500">No teams assigned.</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-sky-300">{alliance.members.length > 0 ? 'Ready' : 'TBD'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-            {(!data?.alliances || data.alliances.length === 0) && (
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                  <div className="mb-4 text-[11px] uppercase tracking-[0.2em] text-slate-500">Bracket</div>
+                  <div className="flex min-h-[360px] items-stretch gap-5 overflow-x-auto pb-2">
+                    {allianceBracketRounds.length > 0 ? (
+                      allianceBracketRounds.map((round, roundIndex) => (
+                        <div key={`round-${roundIndex}`} className="flex min-w-[190px] flex-col justify-between gap-5">
+                          <div className="text-center text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                            {roundIndex === allianceBracketRounds.length - 1 ? 'Finals' : `Match ${roundIndex + 1}`}
+                          </div>
+
+                          {round.map((match, matchIndex) => (
+                            <div key={`match-${roundIndex}-${matchIndex}`} className="relative flex flex-col justify-center">
+                              <div className="rounded border border-slate-700 bg-slate-800/80 p-2 shadow-sm shadow-slate-950/20">
+                                <div className="border-b border-slate-700 pb-2 text-sm font-semibold text-sky-300">
+                                  {match.left}
+                                </div>
+                                <div className="pt-2 text-sm font-semibold text-sky-300">
+                                  {match.right}
+                                </div>
+                              </div>
+                              {roundIndex < allianceBracketRounds.length - 1 && (
+                                <div className="mx-auto mt-2 h-8 w-px bg-slate-600" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-slate-500">No bracket data available.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
               <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/50 p-6 text-center text-slate-400">
                 No alliance data available from the backend.
               </div>
