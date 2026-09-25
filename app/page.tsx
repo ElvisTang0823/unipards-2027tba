@@ -341,8 +341,13 @@ export default function EventDashboard() {
     const baseNames = (data?.alliances ?? []).map((alliance) => alliance.name).filter(Boolean);
     if (baseNames.length === 0) return [];
 
+    const normalizedNames = [...baseNames];
+    while ((normalizedNames.length & (normalizedNames.length - 1)) !== 0) {
+      normalizedNames.push('TBD');
+    }
+
     const rounds: Array<Array<{ left: string; right: string }>> = [];
-    let current = [...baseNames];
+    let current = [...normalizedNames];
 
     while (current.length > 1) {
       const nextRound: Array<{ left: string; right: string }> = [];
@@ -353,7 +358,7 @@ export default function EventDashboard() {
         });
       }
       rounds.push(nextRound);
-      current = Array.from({ length: Math.ceil(nextRound.length / 2) }, (_, index) => `Winner ${index + 1}`);
+      current = Array.from({ length: nextRound.length }, (_, index) => `Winner ${index + 1}`);
     }
 
     return rounds;
@@ -452,12 +457,12 @@ export default function EventDashboard() {
 
             <div className="overflow-x-auto">
               <table className="min-w-full table-fixed border-collapse text-left">
-                <thead className="bg-slate-800/70 text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                <thead className="bg-slate-800/70 text-[10px] uppercase tracking-[0.18em] text-slate-400">
                   <tr>
-                    <th className="w-24 px-3 py-3">Match</th>
-                    <th className="px-3 py-3 text-red-300">Red Alliance</th>
-                    <th className="px-3 py-3 text-blue-300">Blue Alliance</th>
-                    <th className="w-32 px-3 py-3 text-center">Scores</th>
+                    <th className="w-[14%] px-2 py-3">Match</th>
+                    <th className="w-[38%] px-2 py-3 text-red-300">Red Alliance</th>
+                    <th className="w-[38%] px-2 py-3 text-blue-300">Blue Alliance</th>
+                    <th className="w-[10%] px-2 py-3 text-center">Score</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -471,9 +476,9 @@ export default function EventDashboard() {
                     }, {});
 
                     return Object.entries(groups).map(([label, matches]) => (
-                      <>
-                        <tr key={`${label}-header`} className="border-t border-slate-800 bg-slate-800/50">
-                          <td colSpan={4} className="px-3 py-3 text-sm font-bold uppercase tracking-[0.22em] text-slate-200">
+                      <Fragment key={label}>
+                        <tr className="border-t border-slate-800 bg-slate-800/50">
+                          <td colSpan={4} className="px-3 py-2 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-200">
                             {label}
                           </td>
                         </tr>
@@ -494,30 +499,40 @@ export default function EventDashboard() {
                               onClick={() => handleMatchOpen(match.Match_Number)}
                               className="cursor-pointer border-t border-slate-800 transition hover:bg-slate-800/60"
                             >
-                              <td className="px-3 py-3 align-middle">
-                                <div className="flex items-center gap-2">
-                                  <span className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-[10px] text-slate-300">
+                              <td className="px-2 py-2 align-middle">
+                                <div className="flex items-center gap-2 whitespace-nowrap">
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-[8px] text-slate-300">
                                     ○
                                   </span>
-                                  <span className="text-sm font-semibold text-white">{displayMatch}</span>
+                                  <span className="text-xs font-semibold text-white">{displayMatch}</span>
                                 </div>
                               </td>
-                              <td className="px-3 py-3 align-middle text-red-200">
-                                <div className="flex flex-wrap gap-2">
+                              <td className="px-2 py-2 align-middle text-red-200">
+                                <div className="flex min-w-0 flex-wrap items-center gap-1 text-[11px]">
                                   {redTeams.length ? redTeams.map((team) => (
-                                    <span key={`${match.Match_Number}-red-${team}`} className={Boolean(match.Red_Eliminated) ? 'line-through opacity-70' : ''}>{team}</span>
+                                    <span
+                                      key={`${match.Match_Number}-red-${team}`}
+                                      className={`inline-flex items-center rounded border px-1.5 py-0.5 ${Boolean(match.Red_Eliminated) ? 'border-red-700/80 bg-red-900/40 text-red-200 line-through opacity-70' : 'border-red-700/60 bg-red-900/20 text-red-100'}`}
+                                    >
+                                      {team}
+                                    </span>
                                   )) : <span className="text-slate-500">-</span>}
                                 </div>
                               </td>
-                              <td className="px-3 py-3 align-middle text-blue-200">
-                                <div className="flex flex-wrap gap-2">
+                              <td className="px-2 py-2 align-middle text-blue-200">
+                                <div className="flex min-w-0 flex-wrap items-center gap-1 text-[11px]">
                                   {blueTeams.length ? blueTeams.map((team) => (
-                                    <span key={`${match.Match_Number}-blue-${team}`} className={Boolean(match.Blue_Eliminated) ? 'line-through opacity-70' : ''}>{team}</span>
+                                    <span
+                                      key={`${match.Match_Number}-blue-${team}`}
+                                      className={`inline-flex items-center rounded border px-1.5 py-0.5 ${Boolean(match.Blue_Eliminated) ? 'border-blue-700/80 bg-blue-900/40 text-blue-200 line-through opacity-70' : 'border-blue-700/60 bg-blue-900/20 text-blue-100'}`}
+                                    >
+                                      {team}
+                                    </span>
                                   )) : <span className="text-slate-500">-</span>}
                                 </div>
                               </td>
-                              <td className="px-3 py-3 align-middle text-center font-mono text-sm">
-                                <div className="flex items-center justify-center gap-3">
+                              <td className="px-2 py-2 align-middle text-center font-mono text-xs">
+                                <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                                   <span className={match.Winner === 'Red' ? 'font-black text-red-300' : 'text-slate-300'}>{match.Red_Total_Score}</span>
                                   <span className="text-slate-500">-</span>
                                   <span className={match.Winner === 'Blue' ? 'font-black text-blue-300' : 'text-slate-300'}>{match.Blue_Total_Score}</span>
@@ -526,7 +541,7 @@ export default function EventDashboard() {
                             </tr>
                           );
                         })}
-                      </>
+                      </Fragment>
                     ));
                   })()}
                 </tbody>
@@ -645,34 +660,39 @@ export default function EventDashboard() {
 
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
                   <div className="mb-4 text-[11px] uppercase tracking-[0.2em] text-slate-500">Bracket</div>
-                  <div className="flex min-h-[360px] items-stretch gap-5 overflow-x-auto pb-2">
-                    {allianceBracketRounds.length > 0 ? (
-                      allianceBracketRounds.map((round, roundIndex) => (
-                        <div key={`round-${roundIndex}`} className="flex min-w-[190px] flex-col justify-between gap-5">
-                          <div className="text-center text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                            {roundIndex === allianceBracketRounds.length - 1 ? 'Finals' : `Match ${roundIndex + 1}`}
-                          </div>
-
-                          {round.map((match, matchIndex) => (
-                            <div key={`match-${roundIndex}-${matchIndex}`} className="relative flex flex-col justify-center">
-                              <div className="rounded border border-slate-700 bg-slate-800/80 p-2 shadow-sm shadow-slate-950/20">
-                                <div className="border-b border-slate-700 pb-2 text-sm font-semibold text-sky-300">
-                                  {match.left}
-                                </div>
-                                <div className="pt-2 text-sm font-semibold text-sky-300">
-                                  {match.right}
-                                </div>
-                              </div>
-                              {roundIndex < allianceBracketRounds.length - 1 && (
-                                <div className="mx-auto mt-2 h-8 w-px bg-slate-600" />
-                              )}
+                  <div className="overflow-x-auto pb-2">
+                    <div className="flex min-w-[780px] items-stretch gap-6">
+                      {allianceBracketRounds.length > 0 ? (
+                        allianceBracketRounds.map((round, roundIndex) => (
+                          <div key={`round-${roundIndex}`} className="flex min-w-[170px] flex-1 flex-col justify-center gap-6">
+                            <div className="text-center text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                              {roundIndex === allianceBracketRounds.length - 1 ? 'Finals' : `Round ${roundIndex + 1}`}
                             </div>
-                          ))}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-slate-500">No bracket data available.</div>
-                    )}
+
+                            <div className="relative flex flex-col gap-5">
+                              {round.map((match, matchIndex) => (
+                                <div key={`match-${roundIndex}-${matchIndex}`} className="relative flex items-center">
+                                  <div className="w-full rounded-xl border border-slate-700 bg-slate-900/80 p-2 shadow-sm shadow-slate-950/30">
+                                    <div className="mb-2 border-b border-slate-700 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">
+                                      {match.left}
+                                    </div>
+                                    <div className="text-[12px] font-semibold text-slate-200">
+                                      {match.right}
+                                    </div>
+                                  </div>
+
+                                  {roundIndex < allianceBracketRounds.length - 1 && (
+                                    <div className="pointer-events-none absolute -right-5 top-1/2 h-px w-5 -translate-y-1/2 bg-slate-600" />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-slate-500">No bracket data available.</div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
