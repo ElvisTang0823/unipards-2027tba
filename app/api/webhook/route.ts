@@ -1,19 +1,17 @@
 import { NextResponse } from 'next/server';
 
 const GAS_WEB_APP_URL = process.env.GAS_WEB_APP_URL!;
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'my-scrimmage-secret-1234';
+const CHEESY_WEBHOOK_SECRET = process.env.CHEESY_WEBHOOK_SECRET!;
 
 export async function POST(request: Request) {
+  const authHeader = request.headers.get('x-cheesy-secret');
+
+  if (authHeader !== CHEESY_WEBHOOK_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized Webhook Secret' }, { status: 401 });
+  }
+
   try {
-    // 檢查資安金鑰
-    const secret = request.headers.get('x-cheesy-secret');
-    if (secret !== WEBHOOK_SECRET) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
-
-    // 轉發給 GAS
     await fetch(GAS_WEB_APP_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
