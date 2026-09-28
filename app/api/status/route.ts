@@ -4,9 +4,16 @@ const GAS_WEB_APP_URL = process.env.GAS_WEB_APP_URL!;
 const CLIENT_API_KEY = process.env.CLIENT_API_KEY!;
 
 export async function GET(request: Request) {
-  // 1. 資安驗證：檢查 Header 或 URL query 是否帶有正確的 client-key
+  // 從環境變數讀取後端設定的 Key
+  const CLIENT_API_KEY = process.env.CLIENT_API_KEY || process.env.NEXT_PUBLIC_CLIENT_API_KEY;
+
+  // 抓取前端傳來的 Key
   const { searchParams } = new URL(request.url);
   const clientKey = request.headers.get('x-client-key') || searchParams.get('key');
+
+  // 💡 Debug 密技：如果還是 401，可以先在 console 印出來看是哪裡沒對上
+  // console.log('Client Key:', clientKey);
+  // console.log('Expected Key:', CLIENT_API_KEY);
 
   if (!clientKey || clientKey !== CLIENT_API_KEY) {
     return NextResponse.json(

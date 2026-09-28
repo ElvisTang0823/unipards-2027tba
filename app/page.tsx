@@ -64,10 +64,10 @@ export default function MiniTBAHome() {
 
         const res = await fetch('/api/status', {
           headers: {
-            'x-client-key': apiKey || '',
+            'x-client-key': apiKey || '', // 確保這裡有拿到值
           },
         });
-
+        
         if (!res.ok) {
           if (res.status === 401) throw new Error('401 Unauthorized: 金鑰不正確');
           throw new Error(`HTTP error! status: ${res.status}`);
