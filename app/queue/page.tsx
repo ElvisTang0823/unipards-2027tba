@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import DashboardHeader from '../components/dashboard-header';
 
 interface QueueState {
   current_match: string;
@@ -108,44 +109,59 @@ export default function QueuePage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-slate-950 p-6 text-slate-100">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-6 flex items-center justify-between">
+    <main className="dashboard-shell subpage-shell">
+      <DashboardHeader active="queue" />
+      <div className="subpage-content queue-page-content">
+        <div className="subpage-heading">
           <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Queue</p>
-            <h1 className="mt-2 text-3xl font-black text-white">Queuing Board</h1>
+            <p className="panel-eyebrow">LIVE EVENT · PIT OPERATIONS</p>
+            <h1>現場叫號看板</h1>
+            <p className="subpage-description">掌握目前場次與即將進場的隊伍資訊。</p>
           </div>
-          <Link href="/" className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-sky-500 hover:text-white">
-            Back to Dashboard
-          </Link>
+          <span className="live-badge"><span className="live-dot" /> LIVE STATUS</span>
         </div>
 
         {loading ? (
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 text-slate-300">Loading queue data...</div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Current Match</div>
-              <div className="mt-2 text-3xl font-black text-white">{queue.current_match}</div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">On Field</div>
-              <div className="mt-2 text-3xl font-black text-sky-300">{queue.on_field}</div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 md:col-span-2">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Queued</div>
-              <div className="mt-2 text-xl font-bold text-slate-100">{queue.queued}</div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 md:col-span-2">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Announcement</div>
-              <div className="mt-2 text-lg font-medium text-amber-300">{queue.announcement}</div>
-            </div>
+          <div className="queue-loading state-card">
+            <span className="loading-mark" aria-hidden="true" />
+            <p>正在同步叫號資訊...</p>
           </div>
+        ) : (
+          <>
+            <section className="queue-feature-grid" aria-label="即時叫號狀態">
+              <article className="queue-feature queue-feature-current">
+                <span className="queue-feature-label">CURRENT MATCH <span>目前賽次</span></span>
+                <strong>{queue.current_match}</strong>
+                <span className="queue-feature-caption">賽程進度</span>
+              </article>
+              <article className="queue-feature queue-feature-field">
+                <span className="queue-feature-label">ON FIELD <span>場上進行中</span></span>
+                <strong>{queue.on_field}</strong>
+                <span className="queue-feature-caption">正在比賽</span>
+              </article>
+            </section>
+
+            <section className="queue-detail-grid" aria-label="叫號公告">
+              <article className="dashboard-panel queue-detail-card">
+                <div className="panel-heading">
+                  <div><p className="panel-eyebrow">ON DECK</p><h2>預備區報到</h2></div>
+                  <span className="queue-icon" aria-hidden="true">↗</span>
+                </div>
+                <p className="queue-detail-value">{queue.queued}</p>
+              </article>
+              <article className="dashboard-panel queue-detail-card">
+                <div className="panel-heading">
+                  <div><p className="panel-eyebrow">ANNOUNCEMENT</p><h2>現場廣播</h2></div>
+                  <span className="announcement-icon" aria-hidden="true">!</span>
+                </div>
+                <p className="queue-detail-value queue-announcement">{queue.announcement}</p>
+              </article>
+            </section>
+          </>
         )}
+        <div className="subpage-return"><Link href="/">← 返回賽事總覽</Link><span>自動同步現場資訊</span></div>
       </div>
+      <footer className="dashboard-footer"><span>NKS EVENT CONTROL</span><span>2027 · 南科模擬賽</span></footer>
     </main>
   );
 }

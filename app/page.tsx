@@ -1,133 +1,201 @@
-﻿'use client';
+'use client';
 
-import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import DashboardHeader from './components/dashboard-header';
 
-// 動態表格組件：給予任何 JSON Array，自動長出 Header 與 Cell
-function DynamicTable({ title, data }: { title: string; data: Record<string, any>[] }) {
-  if (!data || data.length === 0) {
-    return (
-      <div className="my-4 p-4 border rounded shadow-sm">
-        <h2 className="text-xl font-bold mb-2">{title}</h2>
-        <p className="text-gray-500">目前無資料</p>
-      </div>
-    );
-  }
+type DashboardData = {
+  matches: Record<string, unknown>[];
+  rankings: Record<string, unknown>[];
+  alliance: Record<string, unknown>[];
+  awards: Record<string, unknown>[];
+  queue: Record<string, unknown>[];
+};
 
-  // 動態抓取資料的第一筆物件的所有 key 作為 Header
-  const headers = Object.keys(data[0]);
+function DynamicTable({ title, eyebrow, data }: { title: string; eyebrow: string; data: Record<string, unknown>[] }) {
+  const headers = data?.length ? Object.keys(data[0]) : [];
 
   return (
-    <div className="my-4 p-4 border rounded shadow-sm overflow-x-auto">
-      <h2 className="text-xl font-bold mb-2">{title}</h2>
-      <table className="min-w-full text-sm text-left border-collapse">
-        <thead>
-          <tr className="bg-gray-100 border-b">
-            {headers.map((key) => (
-              <th key={key} className="p-2 border-r font-semibold">
-                {key}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, idx) => (
-            <tr key={idx} className="border-b hover:bg-gray-50">
-              {headers.map((key) => (
-                <td key={key} className="p-2 border-r">
-                  {typeof row[key] === 'object' ? JSON.stringify(row[key]) : String(row[key] ?? '')}
-                </td>
+    <section className="dashboard-panel">
+      <div className="panel-heading">
+        <div>
+          <p className="panel-eyebrow">{eyebrow}</p>
+          <h2>{title}</h2>
+        </div>
+        <span className="panel-count">{data?.length ?? 0} 筆</span>
+      </div>
+      {headers.length === 0 ? (
+        <div className="table-empty">目前尚無資料</div>
+      ) : (
+        <div className="table-scroll">
+          <table className="dashboard-table">
+            <thead>
+              <tr>
+                {headers.map((key) => <th key={key}>{key.replaceAll('_', ' ')}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row, idx) => (
+                <tr key={idx}>
+                  {headers.map((key) => (
+                    <td key={key}>
+                      {typeof row[key] === 'object' && row[key] !== null
+                        ? JSON.stringify(row[key])
+                        : String(row[key] ?? '')}
+                    </td>
+                  ))}
+                </tr>
               ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
 export default function MiniTBAHome() {
-  const [data, setData] = useState<{
-    matches: any[];
-    rankings: any[];
-    alliance: any[];
-    awards: any[];
-    queue: any[];
-  } | null>(null);
-  
+  const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 從環境變數抓 CLIENT_API_KEY (Next.js 需加上 NEXT_PUBLIC_ 前綴供前端使用)
         const apiKey = process.env.NEXT_PUBLIC_CLIENT_API_KEY;
-
         const res = await fetch('/api/status', {
-          headers: {
-            'x-client-key': apiKey || '', // 確保這裡有拿到值
-          },
+          headers: { 'x-client-key': apiKey || '' },
         });
-        
+
         if (!res.ok) {
           if (res.status === 401) throw new Error('401 Unauthorized: 金鑰不正確');
           throw new Error(`HTTP error! status: ${res.status}`);
         }
 
-        const json = await res.json();
+        const json: DashboardData = await res.json();
         setData(json);
         setError(null);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '發生未知錯誤');
       }
     };
 
-    // 1. 頁面載入後立即執行一次
     fetchData();
-
-    // 2. 設定限制：每 5000ms (5秒) 呼叫一次 API
     const interval = setInterval(fetchData, 5000);
-
     return () => clearInterval(interval);
   }, []);
 
   if (error) {
-    return <div className="p-8 text-red-500 font-bold">載入失敗: {error}</div>;
+    return (
+      <main className="dashboard-state">
+        <div className="state-card state-error">
+          <span className="state-kicker">連線異常</span>
+          <h1>無法載入賽事資料</h1>
+          <p>{error}</p>
+        </div>
+      </main>
+    );
   }
 
   if (!data) {
-    return <div className="p-8">資料載入中...</div>;
+    return (
+      <main className="dashboard-state">
+        <div className="state-card">
+          <span className="loading-mark" aria-hidden="true" />
+          <p>正在同步賽事資料...</p>
+        </div>
+      </main>
+    );
   }
 
-  return (
-    <main className="p-6 max-w-7xl mx-auto space-y-6">
-      <h1 className="text-3xl font-extrabold tracking-tight">FRC Scrimmage Mini-TBA</h1>
+  const queue = data.queue?.[0];
+  const metrics = [
+    { label: '賽程場次', value: data.matches?.length ?? 0, unit: 'MATCHES', color: 'blue' },
+    { label: '參賽隊伍', value: data.rankings?.length ?? 0, unit: 'TEAMS', color: 'violet' },
+    { label: '聯盟組別', value: data.alliance?.length ?? 0, unit: 'ALLIANCES', color: 'orange' },
+  ];
 
-      {/* 叫號看板 (Queue) */}
-      {data.queue && data.queue.length > 0 && (
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h2 className="text-lg font-bold text-blue-900">📢 現場叫號看板 (Pit Queue)</h2>
-          <div className="grid grid-cols-3 gap-4 mt-2 text-center">
-            <div className="bg-white p-3 rounded shadow-sm">
-              <span className="text-xs text-gray-500 block">當前賽次 (Current)</span>
-              <span className="text-xl font-bold text-blue-600">{data.queue[0]?.["Current Match"] || '-'}</span>
-            </div>
-            <div className="bg-white p-3 rounded shadow-sm">
-              <span className="text-xs text-gray-500 block">場上進行中 (On Field)</span>
-              <span className="text-xl font-bold text-green-600">{data.queue[0]?.["On Field"] || '-'}</span>
-            </div>
-            <div className="bg-white p-3 rounded shadow-sm">
-              <span className="text-xs text-gray-500 block">預備區報到 (Queued)</span>
-              <span className="text-xl font-bold text-orange-600">{data.queue[0]?.["QueuedMatches"] || '-'}</span>
+  return (
+    <main className="dashboard-shell">
+      <DashboardHeader active="overview" />
+
+      <div className="dashboard-content">
+        <section className="event-hero">
+          <div className="hero-copy">
+            <div className="event-label"><span className="live-dot" /> LIVE EVENT <span className="label-divider">/</span> 2027 NKS</div>
+            <h1>南科模擬賽<br /><span>賽事控制台</span></h1>
+            <p>即時掌握賽程、排名與現場叫號資訊。</p>
+          </div>
+          <div className="hero-watermark" aria-hidden="true">NKS</div>
+          <div className="hero-footer">
+            <span>FRC SCRIMMAGE · TAIWAN</span>
+            <span className="sync-state"><span className="sync-dot" /> 每 5 秒自動更新</span>
+          </div>
+        </section>
+
+        <section className="metric-grid" aria-label="賽事統計">
+          {metrics.map((metric, index) => (
+            <article key={metric.label} className={`metric-card metric-${metric.color}`}>
+              <div className="metric-topline">
+                <span className="metric-index">0{index + 1}</span>
+                <span className="metric-unit">{metric.unit}</span>
+              </div>
+              <div className="metric-bottom">
+                <div className="metric-value">{metric.value}</div>
+                <div className="metric-label">{metric.label}</div>
+              </div>
+            </article>
+          ))}
+        </section>
+
+        <section className="queue-overview">
+          <div className="queue-title">
+            <span className="queue-icon" aria-hidden="true">↗</span>
+            <div>
+              <p className="panel-eyebrow">PIT QUEUE</p>
+              <h2>現場叫號</h2>
             </div>
           </div>
-        </div>
-      )}
+          {queue ? (
+            <div className="queue-stats">
+              <div className="queue-stat">
+                <span>目前賽次 <small>CURRENT MATCH</small></span>
+                <strong>{String(queue['Current Match'] ?? '-')}</strong>
+              </div>
+              <div className="queue-stat">
+                <span>場上進行中 <small>ON FIELD</small></span>
+                <strong className="queue-blue">{String(queue['On Field'] ?? '-')}</strong>
+              </div>
+              <div className="queue-stat">
+                <span>預備區報到 <small>ON DECK</small></span>
+                <strong className="queue-orange">{String(queue['QueuedMatches'] ?? '-')}</strong>
+              </div>
+            </div>
+          ) : (
+            <p className="queue-empty">目前沒有待公告的叫號資訊</p>
+          )}
+          <Link href="/queue" className="queue-link">完整叫號看板 <span aria-hidden="true">→</span></Link>
+        </section>
 
-      {/* 5 個動態渲染的數據區塊 (Schema-Agnostic) */}
-      <DynamicTable title="Matches 賽程與成績" data={data.matches} />
-      <DynamicTable title="Rankings 累積排名" data={data.rankings} />
-      <DynamicTable title="Alliance 聯盟團隊" data={data.alliance} />
-      <DynamicTable title="Awards 獲獎清單" data={data.awards} />
+        <div className="section-intro">
+          <div>
+            <p className="panel-eyebrow">EVENT DATA</p>
+            <h2>賽事資料</h2>
+          </div>
+          <span>即時資料 · LIVE DATA</span>
+        </div>
+
+        <div className="data-grid">
+          <DynamicTable title="賽程與成績" eyebrow="MATCH SCHEDULE" data={data.matches ?? []} />
+          <DynamicTable title="累積排名" eyebrow="TEAM RANKINGS" data={data.rankings ?? []} />
+          <DynamicTable title="聯盟團隊" eyebrow="ALLIANCES" data={data.alliance ?? []} />
+          <DynamicTable title="獲獎清單" eyebrow="AWARDS" data={data.awards ?? []} />
+        </div>
+      </div>
+
+      <footer className="dashboard-footer">
+        <span>NKS EVENT CONTROL</span>
+        <span>2027 · 南科模擬賽</span>
+      </footer>
     </main>
   );
 }

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import DashboardHeader from '../components/dashboard-header';
 
 type WinnerSide = 'Red' | 'Blue' | 'Tie';
 
@@ -183,92 +184,117 @@ export default function MatchDetailPage() {
   }, [data, matchId]);
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-200">Loading...</div>;
+    return (
+      <main className="dashboard-state">
+        <div className="state-card"><span className="loading-mark" aria-hidden="true" /><p>正在載入比賽資訊...</p></div>
+      </main>
+    );
   }
 
   if (errorMsg) {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-center text-red-300">{errorMsg}</div>;
+    return (
+      <main className="dashboard-state">
+        <div className="state-card state-error">
+          <span className="state-kicker">資料載入異常</span>
+          <h1>無法載入比賽資訊</h1>
+          <p>{errorMsg}</p>
+          <Link className="state-return" href="/">返回賽事總覽</Link>
+        </div>
+      </main>
+    );
   }
 
   if (!selectedMatch) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-950 p-6 text-center text-slate-200">
-        <h1 className="text-2xl font-black">Match not found</h1>
-        <Link href="/" className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-bold text-white">Back to dashboard</Link>
-      </div>
+      <main className="dashboard-state">
+        <div className="state-card state-error">
+          <span className="state-kicker">MATCH NOT FOUND</span>
+          <h1>找不到這場比賽</h1>
+          <p>請確認賽程編號，或返回賽事總覽重新選擇。</p>
+          <Link className="state-return" href="/">返回賽事總覽</Link>
+        </div>
+      </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto max-w-5xl px-4 py-8 md:px-8">
-        <div className="mb-6 flex items-center justify-between">
+    <main className="dashboard-shell subpage-shell">
+      <DashboardHeader active="match" />
+      <div className="subpage-content match-page-content">
+        <div className="match-page-heading">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Match Details</p>
-            <h1 className="mt-2 text-3xl font-black text-white">{selectedMatch.Match_Number}</h1>
+            <p className="panel-eyebrow">MATCH DETAILS · 賽事詳情</p>
+            <h1>{selectedMatch.Match_Number}</h1>
           </div>
-          <Link href="/" className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-sky-500 hover:text-white">
-            Back to Dashboard
-          </Link>
+          <Link className="back-link" href="/">← 返回賽事總覽</Link>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-red-900/60 bg-red-950/30 p-5">
-            <div className="mb-3 text-[11px] uppercase tracking-[0.22em] text-red-300">Red Alliance</div>
-            <div className="space-y-1 text-lg font-semibold text-red-100">
-              {parseAllianceTeams(selectedMatch.Red_Alliance).map((team) => (
-                <div key={team}>{team}</div>
-              ))}
-            </div>
+        <section className={`match-scoreboard winner-${selectedMatch.Winner.toLowerCase()}`} aria-label="比賽總分">
+          <div className="scoreboard-team scoreboard-red">
+            <span>RED ALLIANCE</span>
+            <strong>{selectedMatch.Red_Total_Score}</strong>
           </div>
+          <div className="scoreboard-center">
+            <span className="scoreboard-result">{selectedMatch.Winner === 'Tie' ? 'TIE GAME' : `${selectedMatch.Winner.toUpperCase()} WINS`}</span>
+            <span className="scoreboard-divider">VS</span>
+          </div>
+          <div className="scoreboard-team scoreboard-blue">
+            <span>BLUE ALLIANCE</span>
+            <strong>{selectedMatch.Blue_Total_Score}</strong>
+          </div>
+        </section>
 
-          <div className="rounded-2xl border border-blue-900/60 bg-blue-950/30 p-5">
-            <div className="mb-3 text-[11px] uppercase tracking-[0.22em] text-blue-300">Blue Alliance</div>
-            <div className="space-y-1 text-lg font-semibold text-blue-100">
-              {parseAllianceTeams(selectedMatch.Blue_Alliance).map((team) => (
-                <div key={team}>{team}</div>
-              ))}
+        <section className="match-alliance-grid" aria-label="參賽聯盟">
+          <article className="alliance-card alliance-red">
+            <div className="alliance-heading"><span className="alliance-dot" /><div><p>RED ALLIANCE</p><h2>紅方聯盟</h2></div></div>
+            <div className="alliance-teams">
+              {parseAllianceTeams(selectedMatch.Red_Alliance).length
+                ? parseAllianceTeams(selectedMatch.Red_Alliance).map((team) => <span className="team-chip" key={team}>{team}</span>)
+                : <span className="team-empty">尚無隊伍資料</span>}
             </div>
-          </div>
-        </div>
+          </article>
+          <article className="alliance-card alliance-blue">
+            <div className="alliance-heading"><span className="alliance-dot" /><div><p>BLUE ALLIANCE</p><h2>藍方聯盟</h2></div></div>
+            <div className="alliance-teams">
+              {parseAllianceTeams(selectedMatch.Blue_Alliance).length
+                ? parseAllianceTeams(selectedMatch.Blue_Alliance).map((team) => <span className="team-chip" key={team}>{team}</span>)
+                : <span className="team-empty">尚無隊伍資料</span>}
+            </div>
+          </article>
+        </section>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-4">
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-center">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Auto</div>
-            <div className="mt-2 text-2xl font-black text-white">{selectedMatch.Red_Auto_Score} - {selectedMatch.Blue_Auto_Score}</div>
+        <section className="match-breakdown-section">
+          <div className="section-intro">
+            <div><p className="panel-eyebrow">SCORE BREAKDOWN</p><h2>分項得分</h2></div>
+            <span>RED — BLUE</span>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-center">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Teleop</div>
-            <div className="mt-2 text-2xl font-black text-white">{selectedMatch.Red_Teleop_Score} - {selectedMatch.Blue_Teleop_Score}</div>
+          <div className="score-breakdown-grid">
+            {[
+              { label: 'AUTO', title: '自動階段', red: selectedMatch.Red_Auto_Score, blue: selectedMatch.Blue_Auto_Score },
+              { label: 'TELEOP', title: '操作階段', red: selectedMatch.Red_Teleop_Score, blue: selectedMatch.Blue_Teleop_Score },
+              { label: 'ENDGAME', title: '結束階段', red: selectedMatch.Red_Endgame_Score, blue: selectedMatch.Blue_Endgame_Score },
+              { label: 'TOTAL', title: '總分', red: selectedMatch.Red_Total_Score, blue: selectedMatch.Blue_Total_Score },
+            ].map((score) => (
+              <article className={`score-breakdown-card${score.label === 'TOTAL' ? ' score-breakdown-total' : ''}`} key={score.label}>
+                <span>{score.label}</span>
+                <h3>{score.title}</h3>
+                <div className="score-pair"><strong className="score-red">{score.red}</strong><i>—</i><strong className="score-blue">{score.blue}</strong></div>
+              </article>
+            ))}
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-center">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Endgame</div>
-            <div className="mt-2 text-2xl font-black text-white">{selectedMatch.Red_Endgame_Score} - {selectedMatch.Blue_Endgame_Score}</div>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-center">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Total</div>
-            <div className="mt-2 text-2xl font-black text-white">{selectedMatch.Red_Total_Score} - {selectedMatch.Blue_Total_Score}</div>
-          </div>
-        </div>
+        </section>
 
-        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-          <div className="mb-4 text-[11px] uppercase tracking-[0.22em] text-slate-500">Breakdown</div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-              <div className="text-sm text-slate-400">Winner</div>
-              <div className="mt-2 text-xl font-black text-white">{selectedMatch.Winner}</div>
-            </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-              <div className="text-sm text-slate-400">Red RP</div>
-              <div className="mt-2 text-xl font-black text-red-300">{selectedMatch.Red_Total_RP}</div>
-            </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-              <div className="text-sm text-slate-400">Blue RP</div>
-              <div className="mt-2 text-xl font-black text-blue-300">{selectedMatch.Blue_Total_RP}</div>
-            </div>
+        <section className="dashboard-panel match-result-panel">
+          <div className="panel-heading"><div><p className="panel-eyebrow">MATCH RESULT</p><h2>比賽結果與排名積分</h2></div></div>
+          <div className="match-result-grid">
+            <div className="result-stat"><span>勝方</span><strong>{selectedMatch.Winner === 'Tie' ? '平手' : `${selectedMatch.Winner} Alliance`}</strong></div>
+            <div className="result-stat result-stat-red"><span>紅方排名積分 <small>RED RP</small></span><strong>{selectedMatch.Red_Total_RP}</strong></div>
+            <div className="result-stat result-stat-blue"><span>藍方排名積分 <small>BLUE RP</small></span><strong>{selectedMatch.Blue_Total_RP}</strong></div>
           </div>
-        </div>
+        </section>
+        <div className="subpage-return"><Link href="/">← 返回賽事總覽</Link><span>賽事數據即時同步</span></div>
       </div>
+      <footer className="dashboard-footer"><span>NKS EVENT CONTROL</span><span>2027 · 南科模擬賽</span></footer>
     </main>
   );
 }
