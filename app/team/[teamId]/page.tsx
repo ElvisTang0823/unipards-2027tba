@@ -5,51 +5,35 @@ import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import DashboardHeader from '../../components/dashboard-header';
 import DataTable from '../../components/data-table';
+import { normalizeEventData, type EventData, type EventRecord } from '../../lib/event-data';
 
-type DataRecord = Record<string, unknown>;
-
-interface TeamEventData {
-  matches: DataRecord[];
-  rankings: DataRecord[];
-  awards: DataRecord[];
-  alliances: DataRecord[];
-}
-
-const EMPTY_DATA: TeamEventData = {
-  matches: [],
-  rankings: [],
-  awards: [],
-  alliances: [],
-};
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/your_gas_deploy_id/exec';
 
 const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-const getRecordValue = (record: DataRecord | undefined, candidates: string[]) => {
+const getRecordValue = (record: EventRecord | undefined, candidates: string[]) => {
   if (!record) return undefined;
   const keys = new Set(candidates.map(normalizeKey));
-  const key = Object.keys(record).find((candidate) => keys.has(normalizeKey(candidate)));
-  return key ? record[key] : undefined;
+  const entry = Object.entries(record).find(([candidate, value]) => (
+    keys.has(normalizeKey(candidate)) && value !== undefined && value !== null && value !== ''
+  ));
+  return entry?.[1];
 };
 
-const getTeamNumber = (record: DataRecord) => {
-  const value = getRecordValue(record, ['Team_Number', 'Team Number', 'Team', 'team_number', 'teamNumber', 'Team_ID', 'team_id']);
+const getTeamNumber = (record: EventRecord) => {
+  const value = getRecordValue(record, ['Team_Number', 'Team Number', 'Team', 'team_number', 'teamNumber', 'Team_ID', 'team_id', 'Team_Key']);
   const teamNumber = typeof value === 'string' || typeof value === 'number' ? String(value).trim() : '';
-  return /^\d+$/.test(teamNumber) ? teamNumber : '';
+  return teamNumber.match(/^(?:frc)?(\d+)$/i)?.[1] ?? '';
 };
 
-const toRecords = (value: unknown): DataRecord[] => {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is DataRecord => typeof item === 'object' && item !== null && !Array.isArray(item));
-};
-
-const includesTeam = (record: DataRecord, teamNumber: string) => {
+const includesTeam = (record: EventRecord, teamNumber: string) => {
   if (getTeamNumber(record) === teamNumber) return true;
 
   const allianceValues = Object.entries(record)
     .filter(([key]) => {
       const normalized = normalizeKey(key);
-      return (normalized.startsWith('red') || normalized.startsWith('blue'))
-        && (normalized.includes('alliance') || normalized.includes('team'));
+      return normalized.includes('team')
+        || ((normalized.startsWith('red') || normalized.startsWith('blue')) && normalized.includes('alliance'));
     })
     .map(([, value]) => value);
 
@@ -60,54 +44,45 @@ const includesTeam = (record: DataRecord, teamNumber: string) => {
   });
 };
 
-const normalizePayload = (payload: unknown): TeamEventData => {
-  if (!payload || typeof payload !== 'object') return EMPTY_DATA;
-  const record = payload as Record<string, unknown>;
-  return {
-    matches: toRecords(record.matches),
-    rankings: toRecords(record.rankings),
-    awards: toRecords(record.awards),
-    alliances: toRecords(record.alliance ?? record.alliances),
-  };
-};
-
 export default function TeamPage() {
   const params = useParams<{ teamId: string }>();
   const teamNumber = decodeURIComponent(String(params?.teamId ?? ''));
-  const [data, setData] = useState<TeamEventData | null>(null);
+  const apiUrl = process.env.NEXT_PUBLIC_GAS_API_URL || DEFAULT_GAS_URL;
+  const [data, setData] = useState<EventData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
+    if (!apiUrl || apiUrl.includes('your_gas_deploy_id')) {
+      return () => {
+        active = false;
+      };
+    }
+
     const fetchData = async () => {
       try {
-        const apiKey = process.env.NEXT_PUBLIC_CLIENT_API_KEY;
-        const response = await fetch('/api/status', {
-          headers: { 'x-client-key': apiKey || '' },
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) throw new Error('賽事資料驗證失敗，請檢查 API 金鑰設定。');
-          throw new Error(`無法取得賽事資料（HTTP ${response.status}）。`);
-        }
-
-        const payload = await response.json();
+        const response = await fetch(apiUrl, { method: 'GET', redirect: 'follow' });
+        if (!response.ok) throw new Error(`無法取得賽事資料（HTTP ${response.status}）。`);
+        const payload: unknown = await response.json();
         if (active) {
-          setData(normalizePayload(payload));
+          setData(normalizeEventData(payload));
           setError(null);
         }
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : '載入賽事資料時發生未知錯誤。');
+        if (active) {
+          setError(err instanceof Error ? err.message : '載入賽事資料時發生未知錯誤。');
+        }
+      } finally {
+        if (active) setLoading(false);
       }
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 5000);
     return () => {
       active = false;
-      clearInterval(interval);
     };
-  }, []);
+  }, [apiUrl]);
 
   const ranking = useMemo(
     () => data?.rankings.find((row) => getTeamNumber(row) === teamNumber),
@@ -122,11 +97,24 @@ export default function TeamPage() {
     [data, teamNumber],
   );
   const alliances = useMemo(
-    () => data?.alliances.filter((alliance) => includesTeam(alliance, teamNumber)) ?? [],
+    () => data?.alliance.filter((alliance) => includesTeam(alliance, teamNumber)) ?? [],
     [data, teamNumber],
   );
   const teamName = String(getRecordValue(ranking ?? {}, ['Team_Name', 'Team Name', 'Name', 'Nickname']) ?? '');
   const teamRank = getRecordValue(ranking ?? {}, ['Rank', 'Ranking', 'Position']);
+
+  if ((!apiUrl || apiUrl.includes('your_gas_deploy_id')) && !data) {
+    return (
+      <main className="dashboard-state">
+        <div className="state-card state-error">
+          <span className="state-kicker">資料來源尚未設定</span>
+          <h1>無法載入隊伍資料</h1>
+          <p>請先設定賽事資料來源，再查看隊伍檔案。</p>
+          <Link className="state-return" href="/">返回賽事總覽</Link>
+        </div>
+      </main>
+    );
+  }
 
   if (error && !data) {
     return (
@@ -141,7 +129,7 @@ export default function TeamPage() {
     );
   }
 
-  if (!data) {
+  if (loading || !data) {
     return (
       <main className="dashboard-state">
         <div className="state-card"><span className="loading-mark" aria-hidden="true" /><p>正在載入隊伍資料...</p></div>
