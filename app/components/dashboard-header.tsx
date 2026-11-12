@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 type DashboardHeaderProps = {
-  active: 'overview' | 'queue' | 'admin' | 'match';
+  active: 'overview' | 'queue' | 'admin' | 'match' | 'team';
 };
 
 export default function DashboardHeader({ active }: DashboardHeaderProps) {

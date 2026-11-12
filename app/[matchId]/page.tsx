@@ -90,7 +90,7 @@ const parseAllianceTeams = (allianceValue: string | undefined) => {
   if (!allianceValue) return [];
   return String(allianceValue)
     .split(/[\n,;|]/)
-    .map((team) => team.replace(/\s+/g, ' ').trim())
+    .map((team) => team.match(/\d+/)?.[0] ?? team.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 };
 
@@ -249,7 +249,9 @@ export default function MatchDetailPage() {
             <div className="alliance-heading"><span className="alliance-dot" /><div><p>RED ALLIANCE</p><h2>紅方聯盟</h2></div></div>
             <div className="alliance-teams">
               {parseAllianceTeams(selectedMatch.Red_Alliance).length
-                ? parseAllianceTeams(selectedMatch.Red_Alliance).map((team) => <span className="team-chip" key={team}>{team}</span>)
+                ? parseAllianceTeams(selectedMatch.Red_Alliance).map((team) => /^\d+$/.test(team)
+                  ? <Link className="team-chip team-chip-link" href={`/team/${encodeURIComponent(team)}`} key={team}>{team}<span aria-hidden="true">↗</span></Link>
+                  : <span className="team-chip" key={team}>{team}</span>)
                 : <span className="team-empty">尚無隊伍資料</span>}
             </div>
           </article>
@@ -257,7 +259,9 @@ export default function MatchDetailPage() {
             <div className="alliance-heading"><span className="alliance-dot" /><div><p>BLUE ALLIANCE</p><h2>藍方聯盟</h2></div></div>
             <div className="alliance-teams">
               {parseAllianceTeams(selectedMatch.Blue_Alliance).length
-                ? parseAllianceTeams(selectedMatch.Blue_Alliance).map((team) => <span className="team-chip" key={team}>{team}</span>)
+                ? parseAllianceTeams(selectedMatch.Blue_Alliance).map((team) => /^\d+$/.test(team)
+                  ? <Link className="team-chip team-chip-link" href={`/team/${encodeURIComponent(team)}`} key={team}>{team}<span aria-hidden="true">↗</span></Link>
+                  : <span className="team-chip" key={team}>{team}</span>)
                 : <span className="team-empty">尚無隊伍資料</span>}
             </div>
           </article>

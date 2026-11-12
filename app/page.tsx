@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import DashboardHeader from './components/dashboard-header';
+import DataTable from './components/data-table';
 
 type DashboardData = {
   matches: Record<string, unknown>[];
@@ -11,48 +12,6 @@ type DashboardData = {
   awards: Record<string, unknown>[];
   queue: Record<string, unknown>[];
 };
-
-function DynamicTable({ title, eyebrow, data }: { title: string; eyebrow: string; data: Record<string, unknown>[] }) {
-  const headers = data?.length ? Object.keys(data[0]) : [];
-
-  return (
-    <section className="dashboard-panel">
-      <div className="panel-heading">
-        <div>
-          <p className="panel-eyebrow">{eyebrow}</p>
-          <h2>{title}</h2>
-        </div>
-        <span className="panel-count">{data?.length ?? 0} 筆</span>
-      </div>
-      {headers.length === 0 ? (
-        <div className="table-empty">目前尚無資料</div>
-      ) : (
-        <div className="table-scroll">
-          <table className="dashboard-table">
-            <thead>
-              <tr>
-                {headers.map((key) => <th key={key}>{key.replaceAll('_', ' ')}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row, idx) => (
-                <tr key={idx}>
-                  {headers.map((key) => (
-                    <td key={key}>
-                      {typeof row[key] === 'object' && row[key] !== null
-                        ? JSON.stringify(row[key])
-                        : String(row[key] ?? '')}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
 
 export default function MiniTBAHome() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -109,9 +68,9 @@ export default function MiniTBAHome() {
 
   const queue = data.queue?.[0];
   const metrics = [
-    { label: '賽程場次', value: data.matches?.length ?? 0, unit: 'MATCHES', color: 'blue' },
-    { label: '參賽隊伍', value: data.rankings?.length ?? 0, unit: 'TEAMS', color: 'violet' },
-    { label: '聯盟組別', value: data.alliance?.length ?? 0, unit: 'ALLIANCES', color: 'orange' },
+    { label: '賽程場次', value: data.matches?.length ?? 0, unit: 'MATCHES', color: 'blue', note: '賽程總數' },
+    { label: '參賽隊伍', value: data.rankings?.length ?? 0, unit: 'TEAMS', color: 'violet', note: '競賽隊伍' },
+    { label: '聯盟組別', value: data.alliance?.length ?? 0, unit: 'ALLIANCES', color: 'orange', note: '已編組聯盟' },
   ];
 
   return (
@@ -121,14 +80,33 @@ export default function MiniTBAHome() {
       <div className="dashboard-content">
         <section className="event-hero">
           <div className="hero-copy">
-            <div className="event-label"><span className="live-dot" /> LIVE EVENT <span className="label-divider">/</span> 2027 NKS</div>
-            <h1>南科模擬賽<br /><span>賽事控制台</span></h1>
-            <p>即時掌握賽程、排名與現場叫號資訊。</p>
+            <div className="event-label"><span className="live-dot" /> 2027 SEASON <span className="label-divider">/</span> TAIWAN</div>
+            <h1>為下一場<br /><span>全力以赴。</span></h1>
+            <p>南科模擬賽即時數據中心，賽程、排名與場邊資訊一站掌握。</p>
+            <div className="hero-actions">
+              <a className="hero-primary-action" href="#event-data">瀏覽賽事數據 <span aria-hidden="true">↘</span></a>
+              <Link className="hero-secondary-action" href="/queue">現場叫號 <span aria-hidden="true">→</span></Link>
+            </div>
           </div>
-          <div className="hero-watermark" aria-hidden="true">NKS</div>
+          <div className="hero-art" aria-hidden="true">
+            <div className="art-orbit art-orbit-outer" />
+            <div className="art-orbit art-orbit-inner" />
+            <div className="art-field">
+              <span className="field-center" />
+              <span className="field-line field-line-horizontal" />
+              <span className="field-line field-line-vertical" />
+              <span className="field-zone field-zone-red" />
+              <span className="field-zone field-zone-blue" />
+              <span className="field-robot field-robot-one" />
+              <span className="field-robot field-robot-two" />
+              <span className="field-robot field-robot-three" />
+            </div>
+            <span className="art-coordinate art-coordinate-top">FRC · 2027</span>
+            <span className="art-coordinate art-coordinate-bottom">22°59&apos;N / 120°16&apos;E</span>
+          </div>
           <div className="hero-footer">
-            <span>FRC SCRIMMAGE · TAIWAN</span>
-            <span className="sync-state"><span className="sync-dot" /> 每 5 秒自動更新</span>
+            <span><span className="hero-footer-mark">N</span> NKS · SOUTHERN TAIWAN</span>
+            <span className="sync-state"><span className="sync-dot" /> LIVE DATA <i /> 每 5 秒更新</span>
           </div>
         </section>
 
@@ -141,18 +119,19 @@ export default function MiniTBAHome() {
               </div>
               <div className="metric-bottom">
                 <div className="metric-value">{metric.value}</div>
-                <div className="metric-label">{metric.label}</div>
+                <div className="metric-description"><div className="metric-label">{metric.label}</div><span>{metric.note}</span></div>
               </div>
+              <span className="metric-sparkline" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span>
             </article>
           ))}
         </section>
 
         <section className="queue-overview">
           <div className="queue-title">
-            <span className="queue-icon" aria-hidden="true">↗</span>
+            <span className="queue-icon" aria-hidden="true"><span /></span>
             <div>
-              <p className="panel-eyebrow">PIT QUEUE</p>
-              <h2>現場叫號</h2>
+              <p className="panel-eyebrow">PIT LANE · LIVE</p>
+              <h2>場邊即時動態</h2>
             </div>
           </div>
           {queue ? (
@@ -173,22 +152,23 @@ export default function MiniTBAHome() {
           ) : (
             <p className="queue-empty">目前沒有待公告的叫號資訊</p>
           )}
-          <Link href="/queue" className="queue-link">完整叫號看板 <span aria-hidden="true">→</span></Link>
+          <Link href="/queue" className="queue-link">開啟叫號看板 <span aria-hidden="true">↗</span></Link>
         </section>
 
-        <div className="section-intro">
+        <div className="section-intro" id="event-data">
           <div>
-            <p className="panel-eyebrow">EVENT DATA</p>
-            <h2>賽事資料</h2>
+            <p className="panel-eyebrow">THE NUMBERS BEHIND THE MATCH</p>
+            <h2>賽事數據 <span>01—04</span></h2>
+            <p className="section-helper">點擊場次或隊伍編號，查看比賽詳情與隊伍檔案。</p>
           </div>
-          <span>即時資料 · LIVE DATA</span>
+          <span><i className="sync-dot" /> LIVE DATA · 每 5 秒更新</span>
         </div>
 
         <div className="data-grid">
-          <DynamicTable title="賽程與成績" eyebrow="MATCH SCHEDULE" data={data.matches ?? []} />
-          <DynamicTable title="累積排名" eyebrow="TEAM RANKINGS" data={data.rankings ?? []} />
-          <DynamicTable title="聯盟團隊" eyebrow="ALLIANCES" data={data.alliance ?? []} />
-          <DynamicTable title="獲獎清單" eyebrow="AWARDS" data={data.awards ?? []} />
+          <DataTable title="賽程與成績" eyebrow="MATCH SCHEDULE" data={data.matches ?? []} linkMode="match" />
+          <DataTable title="累積排名" eyebrow="TEAM RANKINGS" data={data.rankings ?? []} linkMode="team" />
+          <DataTable title="聯盟團隊" eyebrow="ALLIANCES" data={data.alliance ?? []} linkMode="team" />
+          <DataTable title="獲獎清單" eyebrow="AWARDS" data={data.awards ?? []} linkMode="team" />
         </div>
       </div>
 
